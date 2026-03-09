@@ -1,0 +1,122 @@
+import pygame
+import sys
+
+# --- 設定 ---
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 400
+FPS = 60
+
+# 色の定義
+COLOR_SKY = (135, 206, 235)
+COLOR_LAVA = (255, 69, 0)
+COLOR_PLAYER = (50, 205, 50)
+COLOR_PLATFORM = (139, 69, 19)
+COLOR_GOAL = (255, 215, 0)
+
+# 物理演算定数
+GRAVITY = 0.8
+JUMP_STRENGTH = -16
+PLAYER_SPEED = 5
+
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(COLOR_PLAYER)
+        self.rect = self.image.get_rect(center=(50, 200))
+        self.vel_y = 0
+        self.is_jumping = False
+
+    def update(self, platforms):
+        keys = pygame.key.get_pressed()
+        
+        # 左右移動
+        if keys[pygame.K_LEFT]:
+            self.rect.x -= PLAYER_SPEED
+        if keys[pygame.K_RIGHT]:
+            self.rect.x += PLAYER_SPEED
+
+        # 重力とジャンプ
+        self.vel_y += GRAVITY
+        self.rect.y += self.vel_y
+
+        # 足場との衝突判定
+        hit = pygame.sprite.spritecollide(self, platforms, False)
+        if hit and self.vel_y > 0:
+            self.rect.bottom = hit[0].rect.top
+            self.vel_y = 0
+            self.is_jumping = False
+
+        if keys[pygame.K_SPACE] and not self.is_jumping:
+            self.vel_y = JUMP_STRENGTH
+            self.is_jumping = True
+
+class Platform(pygame.sprite.Sprite):
+    def __init__(self, x, y, w, h, is_goal=False):
+        super().__init__()
+        self.image = pygame.Surface((w, h))
+        self.image.fill(COLOR_GOAL if is_goal else COLOR_PLATFORM)
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.is_goal = is_goal
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("マグマ脱出アクション！")
+    clock = pygame.time.Clock()
+
+    # グループ作成
+    all_sprites = pygame.sprite.Group()
+    platforms = pygame.sprite.Group()
+
+    # 足場の配置 (x, y, width, height)
+    level_data = [
+        (0, 350, 150, 50),
+        (200, 300, 100, 20),
+        (350, 220, 100, 20),
+        (500, 300, 100, 20),
+        (680, 200, 120, 20, True) # ゴール
+    ]
+
+    for data in level_data:
+        p = Platform(*data)
+        all_sprites.add(p)
+        platforms.add(p)
+
+    player = Player()
+    all_sprites.add(player)
+
+    running = True
+    while running:
+        screen.fill(COLOR_SKY)
+        # 下部のマグマ描画
+        pygame.draw.rect(screen, COLOR_LAVA, (0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        all_sprites.update(platforms)
+
+        # 判定：マグマに落ちたか
+        if player.rect.top > SCREEN_HEIGHT:
+            print("マグマに落ちた！ゲームオーバー")
+            player.rect.center = (50, 200)
+            player.vel_y = 0
+
+        # 判定：ゴールに触れたか
+        hits = pygame.sprite.spritecollide(player, platforms, False)
+        for h in hits:
+            if h.is_goal:
+                print("ゴール！おめでとう！")
+                running = False
+
+        all_sprites.draw(screen)
+        pygame.display.flip()
+        clock.tick(FPS)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
